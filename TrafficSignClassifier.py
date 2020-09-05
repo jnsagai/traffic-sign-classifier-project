@@ -71,9 +71,31 @@ X_train_pre = X_train
 X_valid_pre = X_valid
 X_test_pre = X_test
 
+# Get the most frequent class
+most_freq_class = np.bincount(y_train).argmax()
+max_samples = np.bincount(y_train)[most_freq_class]
+
+for i in range(n_classes):
+    # New samples list
+    # new_samples = []
+        
+    # Get the difference between the class with most samples and this class    
+    diff = max_samples - np.bincount(y_train)[i]
+    
+    # Get all the samples from the class
+    sample_index = np.where(y_train == i)
+    sample_class = X_train_pre[sample_index]
+    
+    # Get "diff" random number of samples from the class
+    new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
+    
+    # Stack the new_samples in the original train input and labels
+    X_train_pre = np.vstack((X_train_pre, new_samples))
+    y_train = np.append(y_train, np.repeat(i, diff))
+    
 
 #Shuffle the training data
-#X_train_pre, y_train = shuffle(X_train_pre, y_train)
+X_train_pre, y_train = shuffle(X_train_pre, y_train)
 
 # Plotting label data metrics
 # Plot a random training image
@@ -83,7 +105,7 @@ ax1.imshow(X_train_pre[int(np.random.randint(n_train, size=1))], cmap = 'gray')
 
 # Plot histogram of training classes distribution
 ax2.set_title('Training classes distribution')
-ax2.hist(train['labels'], bins = n_classes)
+ax2.hist(y_train, bins = n_classes)
 
 # Plot histogram of validation labels distribution
 ax3.set_title('Validation classes distribution')
@@ -102,7 +124,7 @@ The EPOCH and BATCH_SIZE values affect the training speed and model accuracy.
 You do not need to modify this section.
 """
 EPOCHS = 10
-BATCH_SIZE = 256
+BATCH_SIZE = 128
 
 def LeNet(x):    
     # Arguments used for tf.truncated_normal, randomly defines variables for the weights and biases for each layer
@@ -127,16 +149,16 @@ def LeNet(x):
     H_out = [(H-F+2P)/S] + 1
     """
     weights = {
-        'wc1': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 3, 6], mean = mu, stddev = sigma)),
-        'wc2': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 6, 16], mean = mu, stddev = sigma)),
-        'wd1': tf.Variable(tf.truncated_normal([400, 120], mean = mu, stddev = sigma)),
-        'wd2': tf.Variable(tf.truncated_normal([120, 84], mean = mu, stddev = sigma)),
+        'wc1': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 3, 12], mean = mu, stddev = sigma)),
+        'wc2': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 12, 32], mean = mu, stddev = sigma)),
+        'wd1': tf.Variable(tf.truncated_normal([800, 300], mean = mu, stddev = sigma)),
+        'wd2': tf.Variable(tf.truncated_normal([300, 84], mean = mu, stddev = sigma)),
         'out': tf.Variable(tf.truncated_normal([84, n_classes], mean = mu, stddev = sigma))}
     
     biases = {
-        'bc1': tf.Variable(tf.truncated_normal([6], mean = mu, stddev = sigma)),
-        'bc2': tf.Variable(tf.truncated_normal([16], mean = mu, stddev = sigma)),
-        'bd1': tf.Variable(tf.truncated_normal([120], mean = mu, stddev = sigma)),
+        'bc1': tf.Variable(tf.truncated_normal([12], mean = mu, stddev = sigma)),
+        'bc2': tf.Variable(tf.truncated_normal([32], mean = mu, stddev = sigma)),
+        'bd1': tf.Variable(tf.truncated_normal([300], mean = mu, stddev = sigma)),
         'bd2': tf.Variable(tf.truncated_normal([84], mean = mu, stddev = sigma)),
         'out': tf.Variable(tf.truncated_normal([n_classes], mean = mu, stddev = sigma))}
     
