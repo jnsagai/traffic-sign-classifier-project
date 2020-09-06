@@ -58,9 +58,9 @@ print("Number of classes =", n_classes)
 # for i in range(n_test):
 #     X_test_pre.append(cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV))
 
-X_train_pre = np.array([cv2.cvtColor(X_train[i], cv2.COLOR_RGB2YUV) for i in range(n_train)])
-X_valid_pre = np.array([cv2.cvtColor(X_valid[i], cv2.COLOR_RGB2YUV) for i in range(n_validation)])
-X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range(n_test)])
+# X_train_pre = np.array([cv2.cvtColor(X_train[i], cv2.COLOR_RGB2YUV) for i in range(n_train)])
+# X_valid_pre = np.array([cv2.cvtColor(X_valid[i], cv2.COLOR_RGB2YUV) for i in range(n_validation)])
+# X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range(n_test)])
 
 # Lets consider only the Y channel
 # X_train_pre = (X_train_pre[:,:,:,:1] - 128) / 128
@@ -70,6 +70,10 @@ X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range
 X_train_pre = X_train
 X_valid_pre = X_valid
 X_test_pre = X_test
+
+# X_train_pre = (X_train - 128) / 128
+# X_valid_pre = (X_valid - 128) / 128
+# X_test_pre = (X_test - 128) / 128
 
 # Get the most frequent class in training dataset
 most_freq_class = np.bincount(y_train).argmax()
@@ -140,17 +144,17 @@ The EPOCH and BATCH_SIZE values affect the training speed and model accuracy.
 
 You do not need to modify this section.
 """
-EPOCHS = 5
+EPOCHS = 10
 BATCH_SIZE = 128
 
 def LeNet(x):    
     # Arguments used for tf.truncated_normal, randomly defines variables for the weights and biases for each layer
     mu = 0
-    sigma = 0.1
+    sigma = 0.03
     
     # Filters hyperparameters
-    filter_size_height = 5
-    filter_size_width = 5
+    # filter_size_height = 5
+    # filter_size_width = 5
     """
     weight = tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, color_channels, k_output]))
     bias = tf.Variable(tf.zeros(k_output))
@@ -166,55 +170,67 @@ def LeNet(x):
     H_out = [(H-F+2P)/S] + 1
     """
     weights = {
-        'wc1': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 3, 6], mean = mu, stddev = sigma)),
-        'wc2': tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, 6, 16], mean = mu, stddev = sigma)),
-        'wd1': tf.Variable(tf.truncated_normal([400, 120], mean = mu, stddev = sigma)),
-        'wd2': tf.Variable(tf.truncated_normal([120, 84], mean = mu, stddev = sigma)),
-        'out': tf.Variable(tf.truncated_normal([84, n_classes], mean = mu, stddev = sigma))}
+        'wc1': tf.Variable(tf.truncated_normal([5, 5, 3, 100], mean = mu, stddev = sigma)),
+        'wc2': tf.Variable(tf.truncated_normal([3, 3, 100, 150], mean = mu, stddev = sigma)),
+        'wc3': tf.Variable(tf.truncated_normal([3, 3, 150, 250], mean = mu, stddev = sigma)),
+        'wd1': tf.Variable(tf.truncated_normal([1000, 300], mean = mu, stddev = sigma)),
+        'wd2': tf.Variable(tf.truncated_normal([300, 200], mean = mu, stddev = sigma)),
+        'out': tf.Variable(tf.truncated_normal([200, n_classes], mean = mu, stddev = sigma))}
     
     biases = {
-        'bc1': tf.Variable(tf.truncated_normal([6], mean = mu, stddev = sigma)),
-        'bc2': tf.Variable(tf.truncated_normal([16], mean = mu, stddev = sigma)),
-        'bd1': tf.Variable(tf.truncated_normal([120], mean = mu, stddev = sigma)),
-        'bd2': tf.Variable(tf.truncated_normal([84], mean = mu, stddev = sigma)),
+        'bc1': tf.Variable(tf.truncated_normal([100], mean = mu, stddev = sigma)),
+        'bc2': tf.Variable(tf.truncated_normal([150], mean = mu, stddev = sigma)),
+        'bc3': tf.Variable(tf.truncated_normal([250], mean = mu, stddev = sigma)),
+        'bd1': tf.Variable(tf.truncated_normal([300], mean = mu, stddev = sigma)),
+        'bd2': tf.Variable(tf.truncated_normal([200], mean = mu, stddev = sigma)),
         'out': tf.Variable(tf.truncated_normal([n_classes], mean = mu, stddev = sigma))}
     
-    # TODO: Layer 1: Convolutional. Input = 32x32x1. Output = 28x28x6.
+    # TODO: Layer 1: Convolutional. Input = 32x32x3. Output = 28x28x100.
     conv1 = tf.nn.conv2d(x, weights['wc1'], strides = [1, 1, 1, 1], padding = 'VALID')
     conv1 = tf.nn.bias_add(conv1, biases['bc1'])
     
     # TODO: Activation.
     conv1 = tf.nn.relu(conv1)
     
-    # TODO: Pooling. Input = 28x28x6. Output = 14x14x6.
+    # TODO: Pooling. Input = 28x28x100. Output = 14x14x100.
     conv1 = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
 
-    # TODO: Layer 2: Convolutional. Output = 10x10x16.
+    # TODO: Layer 2: Convolutional. Input = 14x14x100. Output = 12x12x150.
     conv2 = tf.nn.conv2d(conv1, weights['wc2'], strides = [1, 1, 1, 1], padding = 'VALID')
     conv2 = tf.nn.bias_add(conv2, biases['bc2'])
     
     # TODO: Activation.
     conv2 = tf.nn.relu(conv2)
 
-    # TODO: Pooling. Input = 10x10x16. Output = 5x5x16.
+    # TODO: Pooling. Input = 12x12x150. Output = 6x6x150.
     conv2 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
-
-    # TODO: Flatten. Input = 5x5x16. Output = 400.
-    fc1 = flatten(conv2)
     
-    # TODO: Layer 3: Fully Connected. Input = 400. Output = 120.
+    # TODO: Layer 3: Convolutional. Input = 6x6x150. Output = 4x4x250.
+    conv3 = tf.nn.conv2d(conv2, weights['wc3'], strides = [1, 1, 1, 1], padding = 'VALID')
+    conv3 = tf.nn.bias_add(conv3, biases['bc3'])
+    
+    # TODO: Activation.
+    conv3 = tf.nn.relu(conv3)
+
+    # TODO: Pooling. Input = 4x4x250. Output = 2x2x250.
+    conv3 = tf.nn.max_pool(conv3, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
+
+    # TODO: Flatten. Input = 2x2x250. Output = 400.
+    fc1 = flatten(conv3)
+    
+    # TODO: Layer 3: Fully Connected. Input = 400. Output = 300.
     fc1 = tf.add(tf.matmul(fc1, weights['wd1']), biases['bd1'])
     
     # TODO: Activation.
     fc1 = tf.nn.relu(fc1)
 
-    # TODO: Layer 4: Fully Connected. Input = 120. Output = 84.
+    # TODO: Layer 4: Fully Connected. Input = 300. Output = 200.
     fc2 = tf.add(tf.matmul(fc1, weights['wd2']), biases['bd2'])
     
     # TODO: Activation.
     fc2 = tf.nn.relu(fc2)
 
-    # TODO: Layer 5: Fully Connected. Input = 84. Output = 10.
+    # TODO: Layer 5: Fully Connected. Input = 200. Output = 43.
     logits = tf.add(tf.matmul(fc2, weights['out']), biases['out'])    
   
     return logits
