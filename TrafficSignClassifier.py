@@ -11,6 +11,9 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+import random
+from PIL import Image
+from scipy.ndimage import zoom
 import tensorflow as tf
 from sklearn.utils import shuffle
 from tensorflow.contrib.layers import flatten
@@ -44,20 +47,151 @@ print("Number of classes =", n_classes)
 ### Preprocess the data here. It is required to normalize the data. Other preprocessing steps could include 
 ### converting to grayscale, etc.
 ### Feel free to use as many code cells as needed.
+    
+def apply_CLAHE(image_set, gridsize):  
+    clahe = cv2.createCLAHE(clipLimit=2.0,tileGridSize=(gridsize,gridsize)) 
+    clahe_img_set = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
+    for i in range(image_set.shape[0]):
+        lab = cv2.cvtColor(image_set[i], cv2.COLOR_RGB2LAB)
+        lab_planes = cv2.split(lab)     
+        lab_planes[0] = clahe.apply(lab_planes[0])        
+        lab = cv2.merge(lab_planes)
+        clahe_img_set[i] = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+        
+    return clahe_img_set
 
-# Convert all the images to YUV
-# X_train_pre = []
-# for i in range(n_train):
-#     X_train_pre.append(cv2.cvtColor(X_train[i], cv2.COLOR_RGB2YUV))
+def imageNormalization(image_set):
+    norm_img_set = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
+    for i in range(image_set.shape[0]):
+        norm_img_set[i] = cv2.normalize(image_set[i],  norm_img_set[i], 0, 255, cv2.NORM_MINMAX)
+    
+    return norm_img_set
 
-# X_valid_pre = []
-# for i in range(n_validation):
-#     X_valid_pre.append(cv2.cvtColor(X_valid[i], cv2.COLOR_RGB2YUV))
+def translateImages(image_set, min_range, max_range):
+    rows = image_set.shape[1]
+    cols = image_set.shape[2]
+    
+    translatedImages = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = np.uint8)
+    
+    for i in range(image_set.shape[0]):
+        trans_x = np.random.randint(min_range,high=max_range)
+        trans_y = np.random.randint(min_range,high=max_range)
+        M = np.float32([[1,0,trans_x],[0,1,trans_y]])
+        translatedImages[i] = cv2.warpAffine(image_set[i].astype(np.float32),M,(cols,rows))
+    
+    return translatedImages
 
-# X_test_pre = []
-# for i in range(n_test):
-#     X_test_pre.append(cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV))
+def rotateImages(image_set, min_range, max_range):
+    rotatedImages = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
+    
+    for i in range(image_set.shape[0]):
+        angle = np.random.randint(min_range,high=max_range)
+        #rotatedImages[i] = imutils.rotate(image_set[i].astype(np.float32), angle)
+        im = Image.fromarray(image_set[i].astype('uint8'), 'RGB')
+        rotatedImages[i] = im.rotate(angle)
+    return rotatedImages
 
+def clipped_zoom(img, zoom_factor, **kwargs):
+
+    h, w = img.shape[:2]
+
+    # For multichannel images we don't want to apply the zoom factor to the RGB
+    # dimension, so instead we create a tuple of zoom factors, one per array
+    # dimension, with 1's for any trailing dimensions after the width and height.
+    zoom_tuple = (zoom_factor,) * 2 + (1,) * (img.ndim - 2)
+
+    # Zooming out
+    if zoom_factor < 1:
+
+        # Bounding box of the zoomed-out image within the output array
+        zh = int(np.round(h * zoom_factor))
+        zw = int(np.round(w * zoom_factor))
+        top = (h - zh) // 2
+        left = (w - zw) // 2
+
+        # Zero-padding
+        out = np.zeros_like(img)
+        out[top:top+zh, left:left+zw] = zoom(img, zoom_tuple, **kwargs)
+
+    # Zooming in
+    elif zoom_factor > 1:
+
+        # Bounding box of the zoomed-in region within the input array
+        zh = int(np.round(h / zoom_factor))
+        zw = int(np.round(w / zoom_factor))
+        top = (h - zh) // 2
+        left = (w - zw) // 2
+        
+        out = zoom(img[top:top+zh, left:left+zw], zoom_tuple, **kwargs)
+
+        # `out` might still be slightly larger than `img` due to rounding, so
+        # trim off any extra pixels at the edges
+        trim_top = ((out.shape[0] - h) // 2)
+        trim_left = ((out.shape[1] - w) // 2)
+        out = out[trim_top:trim_top+h, trim_left:trim_left+w]
+
+    # If zoom_factor == 1, just return the input array
+    else:
+        out = img
+    return out
+        
+def scaleImages(image_set, min_range, max_range):
+    scaledImages = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
+    
+    for i in range(image_set.shape[0]):
+        zoom = np.random.uniform(min_range,max_range)
+        scaledImages[i] = clipped_zoom(image_set[i], zoom)
+        
+    return scaledImages
+    
+def generateNewSamples(X, y, rate_trans = 10, rate_scaling = 10, rate_rotate = 10):
+    new_X = X
+    new_y = y
+    #rng = np.random.default_rng()
+    for i in range(n_classes):      
+        # Get the difference between the class with most samples and this class    
+        diff = max_samples - np.bincount(new_y)[i]
+        
+        # Get all the samples from the class
+        sample_index = np.where(new_y == i)
+        sample_class = new_X[sample_index]
+        
+        # Get "diff" random number of samples from the class
+        new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
+        
+        # Get random samples for translation
+        #trans_idx = rng.choice(diff, size=int((diff * rate_trans)/100), replace=False)
+        trans_idx = random.sample(range(diff), int((diff * rate_trans)/100))
+        trans_samples = new_samples[trans_idx]
+        
+        # Generate translate images
+        trans_imgs = translateImages(trans_samples, 1, 4)
+        new_samples[trans_idx] = trans_imgs
+        
+        # Get random samples for rotation
+        #rot_idx = rng.choice(diff, size=int((diff * rate_rotate)/100), replace=False)
+        rot_idx = random.sample(range(diff), int((diff * rate_rotate)/100))
+        rot_samples = new_samples[rot_idx]
+        
+        # Generate rotated images
+        rot_imgs = rotateImages(rot_samples, -15, 15)
+        new_samples[rot_idx] = rot_imgs
+        
+        # Get random samples for scaling
+        #scale_idx = rng.choice(diff, size=int((diff * rate_scaling)/100), replace=False)
+        scale_idx = random.sample(range(diff), int((diff * rate_scaling)/100))
+        scale_samples = new_samples[scale_idx]
+        
+        # Generate scaled images
+        scaled_imgs = scaleImages(scale_samples, 0.9, 1.1)
+        new_samples[scale_idx] = scaled_imgs
+        
+        # Stack the new_samples in the original train input and labels
+        new_X = np.vstack((new_X, new_samples))
+        new_y = np.append(new_y, np.repeat(i, diff))
+    
+    return new_X, new_y
+    
 # X_train_pre = np.array([cv2.cvtColor(X_train[i], cv2.COLOR_RGB2YUV) for i in range(n_train)])
 # X_valid_pre = np.array([cv2.cvtColor(X_valid[i], cv2.COLOR_RGB2YUV) for i in range(n_validation)])
 # X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range(n_test)])
@@ -67,9 +201,9 @@ print("Number of classes =", n_classes)
 # X_valid_pre = (X_valid_pre[:,:,:,:1] - 128) / 128
 # X_test_pre = (X_test_pre[:,:,:,:1] - 128) / 128
 
-X_train_pre = X_train
-X_valid_pre = X_valid
-X_test_pre = X_test
+X_train_pre = imageNormalization(apply_CLAHE(X_train, 2))
+X_valid_pre = imageNormalization(apply_CLAHE(X_valid, 2))
+X_test_pre = imageNormalization(apply_CLAHE(X_test, 2))
 
 # X_train_pre = (X_train - 128) / 128
 # X_valid_pre = (X_valid - 128) / 128
@@ -80,39 +214,41 @@ most_freq_class = np.bincount(y_train).argmax()
 max_samples = np.bincount(y_train)[most_freq_class]
 
 # Get the most frequent class in validation dataset
-most_freq_class_valid = np.bincount(y_valid).argmax()
-max_samples_valid = np.bincount(y_valid)[most_freq_class_valid]
+# most_freq_class_valid = np.bincount(y_valid).argmax()
+# max_samples_valid = np.bincount(y_valid)[most_freq_class_valid]
 
-for i in range(n_classes):      
-    # Get the difference between the class with most samples and this class    
-    diff = max_samples - np.bincount(y_train)[i]
+# for i in range(n_classes):      
+#     # Get the difference between the class with most samples and this class    
+#     diff = max_samples - np.bincount(y_train)[i]
     
-    # Get all the samples from the class
-    sample_index = np.where(y_train == i)
-    sample_class = X_train_pre[sample_index]
+#     # Get all the samples from the class
+#     sample_index = np.where(y_train == i)
+#     sample_class = X_train_pre[sample_index]
     
-    # Get "diff" random number of samples from the class
-    new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
+#     # Get "diff" random number of samples from the class
+#     new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
     
-    # Stack the new_samples in the original train input and labels
-    X_train_pre = np.vstack((X_train_pre, new_samples))
-    y_train = np.append(y_train, np.repeat(i, diff))
+#     # Stack the new_samples in the original train input and labels
+#     X_train_pre = np.vstack((X_train_pre, new_samples))
+#     y_train = np.append(y_train, np.repeat(i, diff))
+
+
+# for i in range(n_classes):      
+#     # Get the difference between the class with most samples and this class    
+#     diff = max_samples - np.bincount(y_valid)[i]
     
-for i in range(n_classes):      
-    # Get the difference between the class with most samples and this class    
-    diff = max_samples - np.bincount(y_valid)[i]
+#     # Get all the samples from the class
+#     sample_index = np.where(y_valid == i)
+#     sample_class = X_valid_pre[sample_index]
     
-    # Get all the samples from the class
-    sample_index = np.where(y_valid == i)
-    sample_class = X_valid_pre[sample_index]
+#     # Get "diff" random number of samples from the class
+#     new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
     
-    # Get "diff" random number of samples from the class
-    new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
-    
-    # Stack the new_samples in the original train input and labels
-    X_valid_pre = np.vstack((X_valid_pre, new_samples))
-    y_valid = np.append(y_valid, np.repeat(i, diff))
-    
+#     # Stack the new_samples in the original train input and labels
+#     X_valid_pre = np.vstack((X_valid_pre, new_samples))
+#     y_valid = np.append(y_valid, np.repeat(i, diff))
+
+X_train_pre, y_train = generateNewSamples(X_train_pre, y_train)
 
 #Shuffle the training data
 X_train_pre, y_train = shuffle(X_train_pre, y_train)
@@ -144,7 +280,7 @@ The EPOCH and BATCH_SIZE values affect the training speed and model accuracy.
 
 You do not need to modify this section.
 """
-EPOCHS = 10
+EPOCHS = 3
 BATCH_SIZE = 128
 
 def LeNet(x):    
