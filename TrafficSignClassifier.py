@@ -197,13 +197,17 @@ def generateNewSamples(X, y, rate_trans = 10, rate_scaling = 10, rate_rotate = 1
 # X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range(n_test)])
 
 # Lets consider only the Y channel
-# X_train_pre = (X_train_pre[:,:,:,:1] - 128) / 128
+# X_train_pre = (X_train[:,:,:,:1] - 128) / 128
 # X_valid_pre = (X_valid_pre[:,:,:,:1] - 128) / 128
 # X_test_pre = (X_test_pre[:,:,:,:1] - 128) / 128
 
-X_train_pre = imageNormalization(apply_CLAHE(X_train, 2))
-X_valid_pre = imageNormalization(apply_CLAHE(X_valid, 2))
-X_test_pre = imageNormalization(apply_CLAHE(X_test, 2))
+# X_train_pre = imageNormalization(apply_CLAHE(X_train, 2))
+# X_valid_pre = imageNormalization(apply_CLAHE(X_valid, 2))
+# X_test_pre = imageNormalization(apply_CLAHE(X_test, 2))
+
+X_train_pre = imageNormalization(X_train)
+X_valid_pre = imageNormalization(X_valid)
+X_test_pre = imageNormalization(X_test)
 
 # X_train_pre = (X_train - 128) / 128
 # X_valid_pre = (X_valid - 128) / 128
@@ -283,10 +287,28 @@ You do not need to modify this section.
 EPOCHS = 3
 BATCH_SIZE = 128
 
+mu = 0
+sigma = 0.03
+    
+weights = {
+    'wc1': tf.Variable(tf.truncated_normal([5, 5, 3, 100], mean = mu, stddev = sigma)),
+    'wc2': tf.Variable(tf.truncated_normal([3, 3, 100, 150], mean = mu, stddev = sigma)),
+    'wc3': tf.Variable(tf.truncated_normal([3, 3, 150, 250], mean = mu, stddev = sigma)),
+    'wd1': tf.Variable(tf.truncated_normal([1000, 500], mean = mu, stddev = sigma)),
+    'wd2': tf.Variable(tf.truncated_normal([500, 250], mean = mu, stddev = sigma)),
+    'out': tf.Variable(tf.truncated_normal([250, n_classes], mean = mu, stddev = sigma))}
+
+biases = {
+    'bc1': tf.Variable(tf.truncated_normal([100], mean = mu, stddev = sigma)),
+    'bc2': tf.Variable(tf.truncated_normal([150], mean = mu, stddev = sigma)),
+    'bc3': tf.Variable(tf.truncated_normal([250], mean = mu, stddev = sigma)),
+    'bd1': tf.Variable(tf.truncated_normal([500], mean = mu, stddev = sigma)),
+    'bd2': tf.Variable(tf.truncated_normal([250], mean = mu, stddev = sigma)),
+    'out': tf.Variable(tf.truncated_normal([n_classes], mean = mu, stddev = sigma))}
+    
 def LeNet(x):    
     # Arguments used for tf.truncated_normal, randomly defines variables for the weights and biases for each layer
-    mu = 0
-    sigma = 0.03
+
     
     # Filters hyperparameters
     # filter_size_height = 5
@@ -305,21 +327,7 @@ def LeNet(x):
     W_out = [(W−F+2P)/S] + 1
     H_out = [(H-F+2P)/S] + 1
     """
-    weights = {
-        'wc1': tf.Variable(tf.truncated_normal([5, 5, 3, 100], mean = mu, stddev = sigma)),
-        'wc2': tf.Variable(tf.truncated_normal([3, 3, 100, 150], mean = mu, stddev = sigma)),
-        'wc3': tf.Variable(tf.truncated_normal([3, 3, 150, 250], mean = mu, stddev = sigma)),
-        'wd1': tf.Variable(tf.truncated_normal([1000, 300], mean = mu, stddev = sigma)),
-        'wd2': tf.Variable(tf.truncated_normal([300, 200], mean = mu, stddev = sigma)),
-        'out': tf.Variable(tf.truncated_normal([200, n_classes], mean = mu, stddev = sigma))}
-    
-    biases = {
-        'bc1': tf.Variable(tf.truncated_normal([100], mean = mu, stddev = sigma)),
-        'bc2': tf.Variable(tf.truncated_normal([150], mean = mu, stddev = sigma)),
-        'bc3': tf.Variable(tf.truncated_normal([250], mean = mu, stddev = sigma)),
-        'bd1': tf.Variable(tf.truncated_normal([300], mean = mu, stddev = sigma)),
-        'bd2': tf.Variable(tf.truncated_normal([200], mean = mu, stddev = sigma)),
-        'out': tf.Variable(tf.truncated_normal([n_classes], mean = mu, stddev = sigma))}
+
     
     # TODO: Layer 1: Convolutional. Input = 32x32x3. Output = 28x28x100.
     conv1 = tf.nn.conv2d(x, weights['wc1'], strides = [1, 1, 1, 1], padding = 'VALID')
@@ -353,18 +361,25 @@ def LeNet(x):
 
     # TODO: Flatten. Input = 2x2x250. Output = 400.
     fc1 = flatten(conv3)
+    #fc1 = tf.concat([flatten(conv2), flatten(conv3)], 1)    
     
     # TODO: Layer 3: Fully Connected. Input = 400. Output = 300.
     fc1 = tf.add(tf.matmul(fc1, weights['wd1']), biases['bd1'])
     
     # TODO: Activation.
     fc1 = tf.nn.relu(fc1)
+    
+    # Dropout
+    fc1 = tf.nn.dropout(fc1, keep_prob)
 
     # TODO: Layer 4: Fully Connected. Input = 300. Output = 200.
     fc2 = tf.add(tf.matmul(fc1, weights['wd2']), biases['bd2'])
     
     # TODO: Activation.
     fc2 = tf.nn.relu(fc2)
+    
+    # Dropout
+    fc2 = tf.nn.dropout(fc2, keep_prob)
 
     # TODO: Layer 5: Fully Connected. Input = 200. Output = 43.
     logits = tf.add(tf.matmul(fc2, weights['out']), biases['out'])    
@@ -382,6 +397,7 @@ You do not need to modify this section.
 x = tf.placeholder(tf.float32, (None, 32, 32, 3))
 y = tf.placeholder(tf.int32, (None))
 one_hot_y = tf.one_hot(y, n_classes)
+keep_prob = tf.placeholder(tf.float32)
 
 """
 Training Pipeline
@@ -394,6 +410,15 @@ rate = 0.001
 logits = LeNet(x)
 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_y, logits=logits)
 loss_operation = tf.reduce_mean(cross_entropy)
+# Apply L2 Regularization
+# loss_operation = tf.reduce_mean(cross_entropy) + \
+#     0.01*tf.nn.l2_loss(weights['wc1']) + \
+#     0.01*tf.nn.l2_loss(weights['wc2']) + \
+#     0.01*tf.nn.l2_loss(weights['wc3']) + \
+#     0.01*tf.nn.l2_loss(weights['wd1']) + \
+#     0.01*tf.nn.l2_loss(weights['wd2']) + \
+#     0.01*tf.nn.l2_loss(weights['out'])
+
 optimizer = tf.train.AdamOptimizer(learning_rate = rate)
 training_operation = optimizer.minimize(loss_operation)
 
@@ -441,7 +466,7 @@ with tf.Session() as sess:
         for offset in range(0, num_examples, BATCH_SIZE):
             end = offset + BATCH_SIZE
             batch_x, batch_y = X_train_pre[offset:end], y_train[offset:end]
-            sess.run(training_operation, feed_dict={x: batch_x, y: batch_y})
+            sess.run(training_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 0.5})
             
         validation_accuracy = evaluate(X_valid_pre, y_valid)
         print("EPOCH {} ...".format(i+1))
