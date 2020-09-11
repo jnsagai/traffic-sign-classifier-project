@@ -9,7 +9,7 @@ Created on Wed Sep  2 21:04:41 2020
 # Load pickled data
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import cv2
 import random
 from PIL import Image
@@ -45,10 +45,17 @@ print("Number of testing examples =", n_test)
 print("Image data shape =", image_shape)
 print("Number of classes =", n_classes)
 
-### Preprocess the data here. It is required to normalize the data. Other preprocessing steps could include 
-### converting to grayscale, etc.
-### Feel free to use as many code cells as needed.
-    
+### Preprocess the data
+
+# Get the sign names from the signnames.csv
+import csv
+signnames = {}
+with open('signnames.csv', 'r') as f:
+    reader = csv.reader(f)
+    for r in reader:
+        if r[0].isdigit():
+            signnames[int(r[0])] = r[1]
+            
 def apply_CLAHE(image_set, gridsize):  
     clahe = cv2.createCLAHE(clipLimit=2.0,tileGridSize=(gridsize,gridsize)) 
     clahe_img_set = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
@@ -61,8 +68,9 @@ def apply_CLAHE(image_set, gridsize):
         
     return clahe_img_set
 
-def imageNormalization(image_set):
-    norm_img_set = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = int)
+def imageNormalization(image_set_in):
+    image_set = image_set_in.astype(np.uint8).copy()
+    norm_img_set = np.zeros((image_set.shape[0],image_set.shape[1],image_set.shape[2],image_set.shape[3]), dtype = np.uint8)
     for i in range(image_set.shape[0]):
         norm_img_set[i] = cv2.normalize(image_set[i],  norm_img_set[i], 0, 255, cv2.NORM_MINMAX)
     
@@ -87,9 +95,9 @@ def rotateImages(image_set, min_range, max_range):
     
     for i in range(image_set.shape[0]):
         angle = np.random.randint(min_range,high=max_range)
-        #rotatedImages[i] = imutils.rotate(image_set[i].astype(np.float32), angle)
         im = Image.fromarray(image_set[i].astype('uint8'), 'RGB')
         rotatedImages[i] = im.rotate(angle)
+    
     return rotatedImages
 
 def clipped_zoom(img, zoom_factor, **kwargs):
@@ -192,100 +200,48 @@ def generateNewSamples(X, y, rate_trans = 10, rate_scaling = 10, rate_rotate = 1
         new_y = np.append(new_y, np.repeat(i, diff))
     
     return new_X, new_y
-    
-# X_train_pre = np.array([cv2.cvtColor(X_train[i], cv2.COLOR_RGB2YUV) for i in range(n_train)])
-# X_valid_pre = np.array([cv2.cvtColor(X_valid[i], cv2.COLOR_RGB2YUV) for i in range(n_validation)])
-# X_test_pre = np.array([cv2.cvtColor(X_test[i], cv2.COLOR_RGB2YUV) for i in range(n_test)])
 
-# Lets consider only the Y channel
-# X_train_pre = (X_train[:,:,:,:1] - 128) / 128
-# X_valid_pre = (X_valid_pre[:,:,:,:1] - 128) / 128
-# X_test_pre = (X_test_pre[:,:,:,:1] - 128) / 128
-
-# X_train_pre = imageNormalization(apply_CLAHE(X_train, 2))
-# X_valid_pre = imageNormalization(apply_CLAHE(X_valid, 2))
-# X_test_pre = imageNormalization(apply_CLAHE(X_test, 2))
-
-X_train_pre = imageNormalization(X_train)
-X_valid_pre = imageNormalization(X_valid)
-X_test_pre = imageNormalization(X_test)
-
-# X_train_pre = (X_train - 128) / 128
-# X_valid_pre = (X_valid - 128) / 128
-# X_test_pre = (X_test - 128) / 128
+X_train_pre = imageNormalization(apply_CLAHE(X_train, 2))
+X_valid_pre = imageNormalization(apply_CLAHE(X_valid, 2))
+X_test_pre = imageNormalization(apply_CLAHE(X_test, 2))
 
 # Get the most frequent class in training dataset
 most_freq_class = np.bincount(y_train).argmax()
 max_samples = np.bincount(y_train)[most_freq_class]
 
-# Get the most frequent class in validation dataset
-# most_freq_class_valid = np.bincount(y_valid).argmax()
-# max_samples_valid = np.bincount(y_valid)[most_freq_class_valid]
-
-# for i in range(n_classes):      
-#     # Get the difference between the class with most samples and this class    
-#     diff = max_samples - np.bincount(y_train)[i]
+# Generate new samples. The number of samples for each training class shall be the same
+# After the generation, apply some disturbances
+for i in range(n_classes):      
+    # Get the difference between the class with most samples and this class    
+    diff = max_samples - np.bincount(y_train)[i]
     
-#     # Get all the samples from the class
-#     sample_index = np.where(y_train == i)
-#     sample_class = X_train_pre[sample_index]
+    # Get all the samples from the class
+    sample_index = np.where(y_train == i)
+    sample_class = X_train_pre[sample_index]
     
-#     # Get "diff" random number of samples from the class
-#     new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
+    # Get "diff" random number of samples from the class
+    new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
     
-#     # Stack the new_samples in the original train input and labels
-#     X_train_pre = np.vstack((X_train_pre, new_samples))
-#     y_train = np.append(y_train, np.repeat(i, diff))
-
-
-# for i in range(n_classes):      
-#     # Get the difference between the class with most samples and this class    
-#     diff = max_samples - np.bincount(y_valid)[i]
+    # Stack the new_samples in the original train input and labels
+    X_train_pre = np.vstack((X_train_pre, new_samples))
+    y_train = np.append(y_train, np.repeat(i, diff))
     
-#     # Get all the samples from the class
-#     sample_index = np.where(y_valid == i)
-#     sample_class = X_valid_pre[sample_index]
-    
-#     # Get "diff" random number of samples from the class
-#     new_samples = sample_class[np.random.randint(len(sample_class), size = diff)]
-    
-#     # Stack the new_samples in the original train input and labels
-#     X_valid_pre = np.vstack((X_valid_pre, new_samples))
-#     y_valid = np.append(y_valid, np.repeat(i, diff))
-
 X_train_pre, y_train = generateNewSamples(X_train_pre, y_train)
 
 #Shuffle the training data
 X_train_pre, y_train = shuffle(X_train_pre, y_train)
 X_valid_pre, y_valid = shuffle(X_valid_pre, y_valid)
+X_test_pre, y_test = shuffle(X_test_pre, y_test)
 
-# Plotting label data metrics
-# Plot a random training image
-f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20,10))
-ax1.set_title('Random training')
-ax1.imshow(X_train_pre[int(np.random.randint(n_train, size=1))], cmap = 'gray')
+### Define architecture.
 
-# Plot histogram of training classes distribution
-ax2.set_title('Training classes distribution')
-ax2.hist(y_train, bins = n_classes)
-
-# Plot histogram of validation labels distribution
-ax3.set_title('Validation classes distribution')
-ax3.hist(y_valid, bins = n_classes)
-
-# Plot histogram of testing classes distribution
-ax3.set_title('Testing classes distribution')
-ax4.hist(test['labels'], bins = n_classes)
-
-### Define your architecture here.
-### Feel free to use as many code cells as needed.
 """
 Setup TensorFlow
 The EPOCH and BATCH_SIZE values affect the training speed and model accuracy.
 
 You do not need to modify this section.
 """
-EPOCHS = 3
+EPOCHS = 10
 BATCH_SIZE = 128
 
 mu = 0
@@ -308,12 +264,6 @@ biases = {
     'out': tf.Variable(tf.truncated_normal([n_classes], mean = mu, stddev = sigma))}
     
 def LeNet(x):    
-    # Arguments used for tf.truncated_normal, randomly defines variables for the weights and biases for each layer
-
-    
-    # Filters hyperparameters
-    # filter_size_height = 5
-    # filter_size_width = 5
     """
     weight = tf.Variable(tf.truncated_normal([filter_size_height, filter_size_width, color_channels, k_output]))
     bias = tf.Variable(tf.zeros(k_output))
@@ -328,61 +278,60 @@ def LeNet(x):
     W_out = [(W−F+2P)/S] + 1
     H_out = [(H-F+2P)/S] + 1
     """
-
     
-    # TODO: Layer 1: Convolutional. Input = 32x32x3. Output = 28x28x100.
+    #Layer 1: Convolutional. Input = 32x32x3. Output = 28x28x100.
     conv1 = tf.nn.conv2d(x, weights['wc1'], strides = [1, 1, 1, 1], padding = 'VALID')
     conv1 = tf.nn.bias_add(conv1, biases['bc1'])
     
-    # TODO: Activation.
+    #Activation.
     conv1 = tf.nn.relu(conv1)
     
-    # TODO: Pooling. Input = 28x28x100. Output = 14x14x100.
+    #Pooling. Input = 28x28x100. Output = 14x14x100.
     conv1 = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
 
-    # TODO: Layer 2: Convolutional. Input = 14x14x100. Output = 12x12x150.
+    #Layer 2: Convolutional. Input = 14x14x100. Output = 12x12x150.
     conv2 = tf.nn.conv2d(conv1, weights['wc2'], strides = [1, 1, 1, 1], padding = 'VALID')
     conv2 = tf.nn.bias_add(conv2, biases['bc2'])
     
-    # TODO: Activation.
+    #Activation.
     conv2 = tf.nn.relu(conv2)
 
-    # TODO: Pooling. Input = 12x12x150. Output = 6x6x150.
+    #Pooling. Input = 12x12x150. Output = 6x6x150.
     conv2 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
     
-    # TODO: Layer 3: Convolutional. Input = 6x6x150. Output = 4x4x250.
+    #Layer 3: Convolutional. Input = 6x6x150. Output = 4x4x250.
     conv3 = tf.nn.conv2d(conv2, weights['wc3'], strides = [1, 1, 1, 1], padding = 'VALID')
     conv3 = tf.nn.bias_add(conv3, biases['bc3'])
     
-    # TODO: Activation.
+    #Activation.
     conv3 = tf.nn.relu(conv3)
 
-    # TODO: Pooling. Input = 4x4x250. Output = 2x2x250.
+    #Pooling. Input = 4x4x250. Output = 2x2x250.
     conv3 = tf.nn.max_pool(conv3, ksize=[1, 2, 2, 1], strides = [1, 2, 2, 1], padding = 'VALID')
 
-    # TODO: Flatten. Input = 2x2x250. Output = 400.
+    #Flatten. Input = 2x2x250. Output = 1000.
     fc1 = flatten(conv3)
     #fc1 = tf.concat([flatten(conv2), flatten(conv3)], 1)    
     
-    # TODO: Layer 3: Fully Connected. Input = 400. Output = 300.
+    #Layer 3: Fully Connected. Input = 1000. Output = 500.
     fc1 = tf.add(tf.matmul(fc1, weights['wd1']), biases['bd1'])
     
-    # TODO: Activation.
+    #Activation.
     fc1 = tf.nn.relu(fc1)
     
-    # Dropout
+    #Dropout
     fc1 = tf.nn.dropout(fc1, keep_prob)
 
-    # TODO: Layer 4: Fully Connected. Input = 300. Output = 200.
+    # Layer 4: Fully Connected. Input = 500. Output = 250.
     fc2 = tf.add(tf.matmul(fc1, weights['wd2']), biases['bd2'])
     
-    # TODO: Activation.
+    #Activation.
     fc2 = tf.nn.relu(fc2)
     
-    # Dropout
+    #Dropout
     fc2 = tf.nn.dropout(fc2, keep_prob)
 
-    # TODO: Layer 5: Fully Connected. Input = 200. Output = 43.
+    #Layer 5: Fully Connected. Input = 250. Output = 43.
     logits = tf.add(tf.matmul(fc2, weights['out']), biases['out'])    
   
     return logits
@@ -411,14 +360,6 @@ rate = 0.001
 logits = LeNet(x)
 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_y, logits=logits)
 loss_operation = tf.reduce_mean(cross_entropy)
-# Apply L2 Regularization
-# loss_operation = tf.reduce_mean(cross_entropy) + \
-#     0.01*tf.nn.l2_loss(weights['wc1']) + \
-#     0.01*tf.nn.l2_loss(weights['wc2']) + \
-#     0.01*tf.nn.l2_loss(weights['wc3']) + \
-#     0.01*tf.nn.l2_loss(weights['wd1']) + \
-#     0.01*tf.nn.l2_loss(weights['wd2']) + \
-#     0.01*tf.nn.l2_loss(weights['out'])
 
 optimizer = tf.train.AdamOptimizer(learning_rate = rate)
 training_operation = optimizer.minimize(loss_operation)
@@ -440,7 +381,7 @@ def evaluate(X_data_in, y_data_in):
     sess = tf.get_default_session()
     for offset in range(0, num_examples, BATCH_SIZE):
         batch_x, batch_y = X_data_in[offset:offset+BATCH_SIZE], y_data_in[offset:offset+BATCH_SIZE]
-        accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
+        accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 1.0})
         total_accuracy += (accuracy * len(batch_x))
     return total_accuracy / num_examples
 
@@ -467,7 +408,7 @@ with tf.Session() as sess:
         for offset in range(0, num_examples, BATCH_SIZE):
             end = offset + BATCH_SIZE
             batch_x, batch_y = X_train_pre[offset:end], y_train[offset:end]
-            sess.run(training_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 0.5})
+            sess.run(training_operation, feed_dict={x: batch_x, y: batch_y, keep_prob: 0.6})
             
         validation_accuracy = evaluate(X_valid_pre, y_valid)
         print("EPOCH {} ...".format(i+1))
@@ -491,4 +432,54 @@ with tf.Session() as sess:
     saver.restore(sess, tf.train.latest_checkpoint('.'))
 
     test_accuracy = evaluate(X_test_pre, y_test)
+    print("Test Accuracy = {:.3f}".format(test_accuracy))
+
+### Run the predictions here and use the model to output the prediction for each image.
+
+#Open and resize all the images
+img = Image.open('test_images/Original_Yield.jpg')
+new_img = img.resize((32,32))
+new_img.save("test_images/Yield.jpg", "JPEG", optimize=True)
+
+img = Image.open('test_images/Original_RoadAbout.jpg')
+new_img = img.resize((32,32))
+new_img.save("test_images/RoadAbout.jpg", "JPEG", optimize=True)
+
+img = Image.open('test_images/Original_RoadWork.jpg')
+new_img = img.resize((32,32))
+new_img.save("test_images/RoadWork.jpg", "JPEG", optimize=True)
+
+img = Image.open('test_images/Original_Speed_Limit_50.jpg')
+new_img = img.resize((32,32))
+new_img.save("test_images/Speed_Limit_50.jpg", "JPEG", optimize=True)
+
+img = Image.open('test_images/Original_Stop.jpg')
+new_img = img.resize((32,32))
+new_img.save("test_images/Stop.jpg", "JPEG", optimize=True)
+
+#Load the images on a new test dataset
+X_NewTestImages = []
+y_newTestImages = np.array([13,40,25,2,14])
+
+X_NewTestImages.append(mpimg.imread("test_images/Yield.jpg"))
+X_NewTestImages.append(mpimg.imread("test_images/RoadAbout.jpg"))
+X_NewTestImages.append(mpimg.imread("test_images/RoadWork.jpg"))
+X_NewTestImages.append(mpimg.imread("test_images/Speed_Limit_50.jpg"))
+X_NewTestImages.append(mpimg.imread("test_images/Stop.jpg"))
+
+softmax_logits = tf.nn.softmax(logits)
+saver = tf.train.Saver()
+features = imageNormalization(apply_CLAHE(np.array(X_NewTestImages), 2))
+with tf.Session() as sess:
+    saver.restore(sess, tf.train.latest_checkpoint('.'))
+    results = sess.run(tf.argmax(logits, 1), {x : features, keep_prob:1.0})
+
+for idx in range(len(features)):
+    print("The expected sign number {} was Class {} - {} and the prediction is Class {} - {}".format(idx + 1, y_newTestImages[idx], signnames[y_newTestImages[idx]], results[idx], signnames[results[idx]]))
+    
+### Calculate the accuracy for these 5 new images. 
+### For example, if the model predicted 1 out of 5 signs correctly, it's 20% accurate on these new images.
+with tf.Session() as sess:
+    saver.restore(sess, tf.train.latest_checkpoint('.'))
+    test_accuracy = evaluate(features, y_newTestImages)
     print("Test Accuracy = {:.3f}".format(test_accuracy))
