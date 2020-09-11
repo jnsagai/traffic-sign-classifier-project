@@ -40,6 +40,7 @@ image_shape = train['features'].shape[1:3]
 n_classes = len(np.unique(train['labels']))
 
 print("Number of training examples =", n_train)
+print("Number of validation examples =", n_validation)
 print("Number of testing examples =", n_test)
 print("Image data shape =", image_shape)
 print("Number of classes =", n_classes)
