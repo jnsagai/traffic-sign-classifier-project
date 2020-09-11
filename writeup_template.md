@@ -170,10 +170,10 @@ Those signs in which features are well defined without so many details ( Yield, 
 
 The code for making predictions on my final model is located in the 30th cell of the Ipython notebook.
 
-For the first image, the model is totally sure that this is a Yield sign (probability of 1.0).
-For the second image, the model is also totally sure that this is a Roundabout mandatory sign (probability of 1.0).
-For the third image, the model wrongly predicted with a probability of 0.8 that this is a Priority Road sign. However, the second guess was correct (Road work) with a probability of 0.2
-For the fourth image, the model wrongly predicted with a probability of 0.49 that this is a Speed Limit (30km/h) sign. However, the second guess was correct (Speed Limit (50km/h)) with a probability of 0.22. It is interesting to notice that all the top 5 guesses were about Speed Limit signs, which demonstrated that the network got to learn the main features.
-For the fifth image, the model is totally sure that this is a Stop sign (probability of 1.0).
+ * For the first image, the model is totally sure that this is a Yield sign (probability of 1.0).
+ * For the second image, the model is also totally sure that this is a Roundabout mandatory sign (probability of 1.0).
+ * For the third image, the model wrongly predicted with a probability of 0.8 that this is a Priority Road sign. However, the second guess was correct (Road work) with a probability of 0.2
+ * For the fourth image, the model wrongly predicted with a probability of 0.49 that this is a Speed Limit (30km/h) sign. However, the second guess was correct (Speed Limit (50km/h)) with a probability of 0.22. It is interesting to notice that all the top 5 guesses were about Speed Limit signs, which demonstrated that the network got to learn the main features.
+ * For the fifth image, the model is totally sure that this is a Stop sign (probability of 1.0).
 
 ![alt text][image13]
